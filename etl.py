@@ -24,12 +24,49 @@ df = df[~((df['Revenue'] < 0) & (df['Units_Sold'] > 0))]
 # Correcting Negative Number
 df['MRP'] = df['MRP'].abs()
 
-# Capping of Discount Percentage
+# Intelligent Fill for Missing Prices (MRP) - Kaggle Method
+# Fills missing prices based on the median price of that specific product
+df["MRP"] = df.groupby("Product_Name")["MRP"].transform(lambda x: x.fillna(x.median()))
+df["MRP"] = df.groupby("Product_Line")["MRP"].transform(lambda x: x.fillna(x.median()))
+
+# Capping of Discount Percentage and filling the blanks with 0
+df['Discount_Applied'] = df['Discount_Applied'].fillna(0)
 df.loc[df['Discount_Applied'] > 1, 'Discount_Applied'] = 1.0
 
-# Handling Missing Values for Units_Sold Column and Size Column
-df['Units_Sold'] = df['Units_Sold'].fillna(1)
-df['Size'] = df['Size'].fillna('Unknown')
+
+# Handling Missing & Negative Values for Units_Sold
+df['Units_Sold'] = df['Units_Sold'].fillna(df['Units_Sold'].median())
+df.loc[df["Units_Sold"] < 0, "Units_Sold"] = 0
+
+# Size Clean-up (Kaggle Method: Map Shoe Sizes to Apparel Sizes)
+df["Size"] = df["Size"].astype(str).str.strip().str.upper()
+df["Size"] = df["Size"].replace(["NAN", "NONE", "ERROR", "UNKNOWN", ""], np.nan)
+
+# Separate numeric sizes from categorical sizes
+numeric_mask = df["Size"].str.match(r"^\d+$", na=False)
+df["Size_Num"] = df["Size"].where(numeric_mask)
+df["Size_Cat"] = df["Size"].where(~numeric_mask)
+df["Size_Num"] = pd.to_numeric(df["Size_Num"], errors="coerce")
+
+# Function to map shoe numbers to S/M/L/XL
+def map_num_to_cat(x):
+    if pd.isna(x): return np.nan
+    elif x <= 7: return "S"
+    elif x <= 9: return "M"
+    elif x <= 11: return "L"
+    else: return "XL"
+
+# Apply mapping and fill missing values with the mode (most common size)
+df.loc[df["Size_Cat"].isna(), "Size_Cat"] = df["Size_Num"].apply(map_num_to_cat)
+df["Size_Cat"] = df["Size_Cat"].fillna(df["Size_Cat"].mode()[0])
+
+# Encode to 0, 1, 2, 3 
+size_order = ["S", "M", "L", "XL"]
+df["Size_Cat"] = pd.Categorical(df["Size_Cat"], categories=size_order, ordered=True)
+df["Size_Cat_Encoded"] = df["Size_Cat"].cat.codes
+
+# Drop intermediate columns (we keep Size_Cat for Power BI labels)
+df.drop(columns=['Size', 'Size_Num'], inplace=True)
 
 print(f"Cleaned Shape to Load: {df.shape}")
 
