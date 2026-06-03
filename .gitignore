@@ -1,3 +1,21 @@
+# Python
 venv/
 __pycache__/
-.vscode
+*.pyc
+
+# VS Code
+.vscode/
+
+# Environment Variables
+.env
+
+# Airflow
+logs/
+airflow.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS Files
+.DS_Store
+Thumbs.db
